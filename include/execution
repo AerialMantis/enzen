@@ -1,0 +1,35 @@
+/*
+Copyright 2018 - 2019 Gordon Brown
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+#ifndef __EXECUTION__
+#define __EXECUTION__
+
+#include <bits/index.h>
+#include <bits/traits.h>
+#include <bits/properties.h>
+#include <bits/future.h>
+#include <bits/sender.h>
+#include <bits/basic_executor.h>
+
+#if __has_include(<bits/backend/static_thread_pool.h>)
+#include <bits/backend/static_thread_pool.h>
+#endif  // __has_include(<bits/backend/static_thread_pool.h>)
+
+#if __has_include(<bits/backend/opencl.h>)
+#include <bits/backend/opencl.h>
+#endif  // __has_include(<bits/backend/opencl.h>)
+
+#endif  // __EXECUTION__
