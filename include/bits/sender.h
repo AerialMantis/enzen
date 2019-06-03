@@ -65,53 +65,11 @@ auto via(Executor executor, Task task) {
 }
 
 template <typename Task, typename Function>
-class transform_task {
- public:
-  transform_task(Task task, Function function)
-      : task_{task}, function_{function} {}
-
-  template <typename Receiver>
-  class wrapped_receiver {
-   public:
-    wrapped_receiver(Function function, Receiver receiver)
-        : function_{function}, receiver_{receiver} {}
-
-    template <typename Value>
-    void value(Value &&value) {
-      enzen::set_value(receiver_, std::invoke(std::move(function_),
-                                              static_cast<Value &&>(value)));
-    }
-
-    void done() { enzen::set_done(receiver_); }
-    template <typename Error>
-    void error(Error &&error) noexcept {
-      enzen::set_error(receiver_, static_cast<Error &&>(error));
-    }
-
-   private:
-    Function function_;
-    Receiver receiver_;
-  };
-
-  template <typename Receiver>
-  void submit(Receiver receiver) noexcept {
-    try {
-      enzen::submit(std::move(task_),
-                    wrapped_receiver<Receiver>{std::move(function_),
-                                               std::move(receiver)});
-    } catch (...) {
-      enzen::set_error(receiver, std::current_exception());
-    }
-  }
-
- private:
-  Task task_;
-  Function function_;
-};
-
-template <typename Task, typename Function>
 auto transform(Task task, Function function) {
-  return transform_task<Task, Function>{std::move(task), std::move(function)};
+  return
+      typename Task::executor_t::backend_t::template transform_task_t<Task,
+                                                                      Function>{
+          std::move(task), function};
 }
 
 }  // namespace enzen

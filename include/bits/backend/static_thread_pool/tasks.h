@@ -19,8 +19,55 @@ limitations under the License.
 
 namespace enzen {
 
+template <typename Task, typename Function>
+class thread_pool_transform_task {
+  template <typename Receiver>
+  class wrapped_receiver {
+   public:
+    wrapped_receiver(Function function, Receiver receiver)
+        : function_{function}, receiver_{receiver} {}
+
+    template <typename Value>
+    void value(Value &&value) {
+      enzen::set_value(receiver_, std::invoke(std::move(function_),
+                                              static_cast<Value &&>(value)));
+    }
+
+    void done() { enzen::set_done(receiver_); }
+    template <typename Error>
+    void error(Error &&error) noexcept {
+      enzen::set_error(receiver_, static_cast<Error &&>(error));
+    }
+
+   private:
+    Function function_;
+    Receiver receiver_;
+  };
+
+ public:
+  using executor_t = typename Task::executor_t;
+
+  thread_pool_transform_task(Task task, Function function)
+      : task_{task}, function_{function} {}
+
+  template <typename Receiver>
+  void submit(Receiver receiver) noexcept {
+    try {
+      enzen::submit(std::move(task_),
+                    wrapped_receiver<Receiver>{std::move(function_),
+                                               std::move(receiver)});
+    } catch (...) {
+      enzen::set_error(receiver, std::current_exception());
+    }
+  }
+
+ private:
+  Task task_;
+  Function function_;
+};
+
 template <typename Executor, typename Task>
-class thread_via_task {
+class thread_pool_via_task {
   template <typename Value, typename Receiver>
   class value_receiver {
    public:
@@ -125,7 +172,9 @@ class thread_via_task {
   };
 
  public:
-  thread_via_task(Executor executor, Task task)
+  using executor_t = Executor;
+
+  thread_pool_via_task(Executor executor, Task task)
       : executor_{std::move(executor)}, task_{std::move(task)} {}
 
   // TODO(Gordon): This function should be r-value qualified

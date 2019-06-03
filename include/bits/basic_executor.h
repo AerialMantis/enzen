@@ -45,6 +45,7 @@ class basic_executor {
  public:
   using backend_t = Backend;
   using sub_executor_t = typename Backend::sub_executor_t;
+  using kernel_name_t = KernelName;
 
   struct schedule_task {
     schedule_task(basic_executor<Backend, Interface, KernelName> taskExec)
@@ -174,6 +175,25 @@ class basic_executor {
                 Interface == detail::executor_interface::lazy>>
   auto schedule() {
     return schedule_task{*this};
+  }
+
+  template <typename Function, typename Callback,
+            typename AlwaysDeduced = KernelName,
+            typename = typename std::enable_if_t<
+                std::is_same_v<AlwaysDeduced, KernelName> &&
+                Interface == detail::executor_interface::lazy>>
+  auto lazy_execute(Function func, Callback &&callback, enzen::shape shape) {
+    return impl_->template lazy_execute<KernelName, Function, Callback>(
+        func, std::move(callback), shape);
+  }
+
+  template <typename Signal>
+  void trigger_signal(Signal signal) {
+    impl_->trigger_signal(signal);
+  }
+
+  std::shared_ptr<Backend> get_impl() {
+    return impl_;
   }
 
  private:

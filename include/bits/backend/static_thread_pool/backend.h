@@ -29,8 +29,11 @@ enum class thread_pool_status : int { idle, running, shutdown, waiting, error };
 
 class thread_pool_backend {
  public:
+  template <typename Task, typename Function>
+  using transform_task_t = enzen::thread_pool_transform_task<Task, Function>;
+
   template <typename Executor, typename Task>
-  using via_task_t = enzen::thread_via_task<Executor, Task>;
+  using via_task_t = enzen::thread_pool_via_task<Executor, Task>;
 
   using executor_t = basic_executor<detail::thread_pool_backend,
                                     detail::executor_interface::oneway, void>;

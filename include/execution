@@ -24,12 +24,10 @@ limitations under the License.
 #include <bits/sender.h>
 #include <bits/basic_executor.h>
 
-#if __has_include(<bits/backend/static_thread_pool.h>)
 #include <bits/backend/static_thread_pool.h>
-#endif  // __has_include(<bits/backend/static_thread_pool.h>)
 
-#if __has_include(<bits/backend/opencl.h>)
+#ifdef ENZEN_OPENCL_BACKEND
 #include <bits/backend/opencl.h>
-#endif  // __has_include(<bits/backend/opencl.h>)
+#endif  // ENZEN_OPENCL_BACKEND
 
 #endif  // __EXECUTION__
