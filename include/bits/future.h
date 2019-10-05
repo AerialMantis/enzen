@@ -156,7 +156,16 @@ class promise {
 
   future<value_t> get_future() { return future<ValueType>{sharedStatePtr_}; }
 
-  void set_value(value_t value) { sharedStatePtr_->set_value(value); }
+  void value(value_t value) {
+    sharedStatePtr_->set_value(value);
+  }
+
+  template <typename Error>
+  void error(Error error) {
+
+  }
+
+  void done() {}
 
   void set_exception(exception_t exception) {
     sharedStatePtr_->set_exception(exception);

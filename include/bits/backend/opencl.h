@@ -25,6 +25,7 @@ limitations under the License.
 #error "SYCL runtime library required for OpenCL backend"
 #endif  // !__has_include(<CL/sycl.hpp>)
 
+#include <bits/backend/opencl/cl_wrapper.h>
 #include <bits/backend/opencl/tasks.h>
 #include <bits/backend/opencl/backend.h>
 #include <bits/backend/opencl/executor.h>

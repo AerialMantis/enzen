@@ -44,18 +44,22 @@ class via_receiver {
 template <typename ValueType>
 class value_receiver {
  public:
-  value_receiver(enzen::device_ptr<ValueType> valuePtr)
-      : valuePtr_{valuePtr} {};
+  value_receiver(ValueType *valuePtr) : valuePtr_{valuePtr} {};
 
-  void value(ValueType value) { *valuePtr_ = value; }
+  void value(ValueType value) {
+*valuePtr_ = value;
+}
 
   template <typename Error>
   void error(Error &&error) noexcept {}
 
   void done() {}
 
+  // TODO(Gordon): Temporary fix, needs proper value_reciever type in back-end
+  ValueType *get_address() const { return valuePtr_; }
+
  private:
-  enzen::device_ptr<ValueType> valuePtr_;
+  ValueType *valuePtr_;
 };
 
 // OpenCL Context Tests
@@ -349,8 +353,6 @@ TEST_CASE("schedule", "opencl") {
   enzen::submit(s1, via_receiver<decltype(lazyExec)>{});
 }
 
-// TODO(Gordon): Currently disabld due to bug in OpenCL back-end
-// #if 0
 TEST_CASE("via_and_transform", "opencl") {
   auto openclContext = enzen::opencl_context{};
 
@@ -363,13 +365,51 @@ TEST_CASE("via_and_transform", "opencl") {
 
   auto s2 = enzen::via(lazyExec, s1);
 
-  auto s3 = enzen::transform(s2, [=]() { return 42; });
+  auto s3 = enzen::transform(s2, [=](int value) { return value * 2; });
 
-  auto res = int{-1};
-  auto resPtr = enzen::device_ptr<int>{&res};
-
-  submit(s3, value_receiver{resPtr});
+  auto res = enzen::sync_get(s3);
 
   REQUIRE(res == 42);
 }
-// #endif
+
+TEST_CASE("via_and_transform_different_types", "opencl") {
+  auto openclContext = enzen::opencl_context{};
+
+  auto exec = openclContext.executor();
+
+  auto lazyExec =
+      exec.require_concept(enzen::lazy).require(enzen::name<kernel<10>>);
+
+  auto s1 = enzen::just(21);
+
+  auto s2 = enzen::via(lazyExec, s1);
+
+  auto s3 = enzen::transform(s2, [=](int value) { return static_cast<float>(value * 2); });
+
+  auto res = enzen::sync_get(s3);
+
+  REQUIRE(res == 42.0f);
+}
+
+/*
+TEST_CASE("transform_chain", "opencl") {
+  auto openclContext = enzen::opencl_context{};
+
+  auto exec = openclContext.executor();
+
+  auto lazyExec =
+      exec.require_concept(enzen::lazy).require(enzen::name<kernel<11>>);
+
+  auto s1 = enzen::just(10.5f);
+
+  auto s2 = enzen::via(lazyExec, s1);
+
+  auto s3 = enzen::transform(s2, [=](float value) { return value * 2.0f; });
+
+  auto s4 = enzen::transform(s3, [=](float value) { return value * 2.0f; });
+
+  auto res = enzen::sync_get(s4);
+
+  REQUIRE(res == 42.0f);
+}
+*/

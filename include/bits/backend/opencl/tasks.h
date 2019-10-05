@@ -22,105 +22,79 @@ limitations under the License.
 
 namespace enzen {
 
-template <typename NextSender, typename Function>
+template <typename NextTask, typename Function>
 class opencl_transform_task;
 
 template <typename Executor, typename Task>
 class opencl_via_task;
 
-template <typename Executor, typename Signal>
+template <typename Executor, typename Value>
 class opencl_transform_receiver {
+  using value_t = Value;
+
  public:
-  opencl_transform_receiver(Executor executor, Signal signal)
-      : executor_{executor}, signal_{signal} {}
+  opencl_transform_receiver(Executor executor, Value *inputPtr, cl_event signal)
+      : executor_{executor}, inputPtr_{std::move(inputPtr)}, signal_{signal} {}
 
   template <typename Value>
   void value(Value &&value) {
-    // TODO: Currently ignoring value
-    // TODO: This could be genealized to a promise type object
-    executor_.trigger_signal(signal_);
+    // Set incoming value.
+    *inputPtr_ = value;
+
+    // Trigger the OpenCL commands to execute.
+    detail::cl_set_user_event_status(signal_, CL_COMPLETE);
   }
 
-  void done() { enzen::set_done(receiver_); }
+  void done() {
+    // Cancel the OpenCL commands with the cancellation code.
+    detail::cl_set_user_event_status(signal_, -9999);
+  }
+
   template <typename Error>
   void error(Error &&error) noexcept {
-    // TODO: Currently ignoring value, callback withh have to handle results and
-    // errors
+    // Cancel the OpenCL commands with the incoming error code.
+    detail::cl_set_user_event_status(signal_, error);
   }
 
   Executor get_executor() const noexcept { return executor_; };
 
  private:
   Executor executor_;
-  Signal signal_;
+  Value *inputPtr_;
+  cl_event signal_;
 };
 
-template <typename NextSender, typename Function>
-class opencl_transform_task;
-
-template <typename T1, typename T2, typename Function>
-class opencl_transform_task<opencl_via_task<T1, T2>, Function> {
+template <typename NextTask, typename Function>
+class opencl_transform_task {
  public:
-  using next_sender_t = typename opencl_via_task<T1, T2>;
-  using executor_t = typename next_sender_t::executor_t;
+  using executor_t = typename NextTask::executor_t;
+  using next_task_t = NextTask;
+  using value_t = std::invoke_result_t<Function, typename NextTask::value_t>;
+  using param_t = typename NextTask::value_t;
 
-  opencl_transform_task(next_sender_t nextSender, Function function)
-      : nextSender_{nextSender}, function_{function} {}
+  opencl_transform_task(next_task_t nextTask, Function function)
+      : nextTask_{nextTask}, function_{function} {}
 
   template <typename IncomingReceiver>
-  void submit(IncomingReceiver incomingReceiver) noexcept {
+  void submit(IncomingReceiver &incomingReceiver) noexcept {
     try {
       auto openclTransformReceiver =
           this->get_executor()
-              .template lazy_execute<Function, IncomingReceiver>(
-                  function_, std::move(incomingReceiver),
-                  enzen::shape{1, 1, 1});
+              .template lazy_execute<param_t, Function, IncomingReceiver>(
+                  function_, incomingReceiver, enzen::shape{1, 1, 1});
 
-      enzen::submit(std::move(nextSender_), openclTransformReceiver);
+      enzen::submit(std::move(nextTask_), openclTransformReceiver);
     } catch (...) {
       enzen::set_error(incomingReceiver, std::current_exception());
     }
   }
 
-  typename next_sender_t::executor_t get_executor() const noexcept {
-    return nextSender_.get_executor();
+  typename next_task_t::executor_t get_executor() const noexcept {
+    return nextTask_.get_executor();
   };
 
  private:
-  next_sender_t nextSender_;
-  Function function_;
-};
-
-template <typename T1, typename T2, typename Function>
-class opencl_transform_task<opencl_transform_task<T1, T2>, Function> {
- public:
-  using next_sender_t = typename opencl_via_task<T1, T2>;
-  using executor_t = typename next_sender_t::executor_t;
-
-  opencl_transform_task(next_sender_t nextSender, Function function)
-      : nextSender_{nextSender}, function_{function} {}
-
-  template <typename IncomingReceiver>
-  void submit(IncomingReceiver incomingReceiver) noexcept {
-    try {
-      auto openclTransformReceiver =
-          this->get_executor()
-              .template lazy_execute<Function, IncomingReceiver>(
-                  function_, std::move(incomingReceiver),
-                  enzen::shape{1, 1, 1});
-
-      enzen::submit(std::move(nextSender_), openclTransformReceiver);
-    } catch (...) {
-      enzen::set_error(incomingReceiver, std::current_exception());
-    }
-  }
-
-  typename next_sender_t::executor_t get_executor() const noexcept {
-    return nextSender_.get_executor();
-  };
-
- private:
-  next_sender_t nextSender_;
+  next_task_t nextTask_;
   Function function_;
 };
 
@@ -147,26 +121,29 @@ class opencl_via_receiver {
   NextReceiver nextReceiver_;
 };
 
-template <typename Executor, typename Task>
+template <typename Executor, typename NextTask>
 class opencl_via_task {
  public:
   using executor_t = Executor;
+  using next_task_t = NextTask;
+  using value_t = typename NextTask::value_t;
+  using param_t = typename NextTask::value_t;
 
-  opencl_via_task(Executor executor, Task task)
-      : executor_{std::move(executor)}, task_{std::move(task)} {}
+  opencl_via_task(Executor executor, NextTask nextTask)
+      : executor_{std::move(executor)}, nextTask_{std::move(nextTask)} {}
 
   // TODO(Gordon): This function should be r-value qualified
   template <typename IncomingReceiver>
   void submit(IncomingReceiver incomingReceiver) noexcept {
-    enzen::submit(std::move(task_), opencl_via_receiver<IncomingReceiver>{
-                                        std::move(incomingReceiver)});
+    enzen::submit(std::move(nextTask_), opencl_via_receiver<IncomingReceiver>{
+                                            std::move(incomingReceiver)});
   }
 
   Executor get_executor() const noexcept { return executor_; };
 
  private:
   Executor executor_;
-  Task task_;
+  NextTask nextTask_;
 };
 
 }  // namespace enzen

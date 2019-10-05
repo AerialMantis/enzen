@@ -42,6 +42,8 @@ void submit(Sender sender, Receiver receiver) {
 template <typename Value>
 class just_task {
  public:
+  using value_t = Value;
+
   just_task(Value value) : value_{value} {}
 
   template <typename Receiver>
@@ -70,6 +72,26 @@ auto transform(Task task, Function function) {
       typename Task::executor_t::backend_t::template transform_task_t<Task,
                                                                       Function>{
           std::move(task), function};
+}
+
+template <typename Task>
+void sync_wait(Task task) {
+  auto promise = enzen::promise<typename Task::vaue_t>{};
+  auto future = promise.get_future();
+
+  submit(task, promise);
+
+  return future.wait();
+}
+
+template <typename Task>
+typename Task::value_t sync_get(Task task) {
+  auto promise = enzen::promise<typename Task::value_t>{};
+  auto future = promise.get_future();
+
+  submit(task, promise);
+
+  return future.get();
 }
 
 }  // namespace enzen

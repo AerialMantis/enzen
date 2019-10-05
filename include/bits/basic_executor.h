@@ -177,14 +177,14 @@ class basic_executor {
     return schedule_task{*this};
   }
 
-  template <typename Function, typename Callback,
+  template <typename Param, typename Function, typename Callback,
             typename AlwaysDeduced = KernelName,
             typename = typename std::enable_if_t<
                 std::is_same_v<AlwaysDeduced, KernelName> &&
                 Interface == detail::executor_interface::lazy>>
-  auto lazy_execute(Function func, Callback &&callback, enzen::shape shape) {
-    return impl_->template lazy_execute<KernelName, Function, Callback>(
-        func, std::move(callback), shape);
+  auto lazy_execute(Function func, Callback &callback, enzen::shape shape) {
+    return impl_->template lazy_execute<Param, KernelName, Function, Callback>(
+        func, callback, shape);
   }
 
   template <typename Signal>
